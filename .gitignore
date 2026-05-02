@@ -1,0 +1,60 @@
+# Build outputs
+build/
+**/build/
+out/
+bin/
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Kotlin
+.kotlin/
+*.kotlin_module
+
+# Android
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+captures/
+proguard/
+release/
+
+# Generated files
+**/generated/
+*.iml
+
+# IDE — IntelliJ / Android Studio
+.idea/
+*.ipr
+*.iws
+
+# IDE — Eclipse
+.classpath
+.project
+.settings/
+
+# IDE — VS Code
+.vscode/
+
+# IDE — NetBeans
+.nb-gradle/
+nbproject/private/
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+hs_err_pid*
+
+# Bundled SLM model (too large for git — copy back into assets/ before building)
+app/src/main/assets/tiny_garden.litertlm

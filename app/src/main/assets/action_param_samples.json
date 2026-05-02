@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Weather (London)",
+    "text": "What's the temperature in London?"
+  },
+  {
+    "title": "Weather (Seoul)",
+    "text": "How hot is it in Seoul right now?"
+  },
+  {
+    "title": "Send SMS",
+    "text": "Send a text to Alice telling her I'll be 10 minutes late."
+  },
+  {
+    "title": "Set Alarm",
+    "text": "Wake me up at 7:30 tomorrow morning."
+  },
+  {
+    "title": "Set Alarm (with label)",
+    "text": "Set an alarm for 6:00 labeled morning run."
+  },
+  {
+    "title": "Irrelevant Query",
+    "text": "Who painted the Mona Lisa?"
+  }
+]

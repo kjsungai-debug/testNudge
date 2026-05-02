@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Greeting",
+    "text": "Hello, how are you doing today?"
+  },
+  {
+    "title": "Weather Question",
+    "text": "Will it rain in Seoul tomorrow afternoon?"
+  },
+  {
+    "title": "Schedule Request",
+    "text": "Please remind me about the team meeting at 3 PM."
+  },
+  {
+    "title": "Product Inquiry",
+    "text": "Can you tell me about the latest smartphone release?"
+  },
+  {
+    "title": "Complaint",
+    "text": "My order has not arrived even though it has been a week."
+  }
+]

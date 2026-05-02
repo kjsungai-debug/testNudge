@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Pronoun Resolution",
+    "text": "Send it to him."
+  },
+  {
+    "title": "Abbreviation Expansion",
+    "text": "weather in nyc tmrw"
+  },
+  {
+    "title": "Add Missing Context",
+    "text": "Remind me about the meeting"
+  },
+  {
+    "title": "Polish Grammar",
+    "text": "what time movie start tonight"
+  },
+  {
+    "title": "Disambiguate Time",
+    "text": "Set alarm for 7"
+  },
+  {
+    "title": "Resolve Vague Place",
+    "text": "Find a coffee shop nearby"
+  }
+]
