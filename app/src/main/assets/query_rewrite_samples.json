@@ -1,26 +1,26 @@
 [
   {
-    "title": "Pronoun Resolution",
-    "text": "Send it to him."
+    "title": "Location — abbreviation",
+    "text": "coffee near nyc times sq"
   },
   {
-    "title": "Abbreviation Expansion",
-    "text": "weather in nyc tmrw"
+    "title": "Location — vague place",
+    "text": "Where is the closest pharmacy"
   },
   {
-    "title": "Add Missing Context",
-    "text": "Remind me about the meeting"
+    "title": "Call — pronoun",
+    "text": "Call him back"
   },
   {
-    "title": "Polish Grammar",
-    "text": "what time movie start tonight"
+    "title": "Call — contact name",
+    "text": "ring mom"
   },
   {
-    "title": "Disambiguate Time",
-    "text": "Set alarm for 7"
+    "title": "Text — fragment",
+    "text": "tell alice running 10 min late"
   },
   {
-    "title": "Resolve Vague Place",
-    "text": "Find a coffee shop nearby"
+    "title": "Text — incomplete sentence",
+    "text": "send msg about meeting"
   }
 ]

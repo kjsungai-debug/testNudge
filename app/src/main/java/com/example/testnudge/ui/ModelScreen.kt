@@ -37,9 +37,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class ModelSubMode(val assetFile: String, val label: String) {
-    ActionParam("action_param_samples.json", "Action Param"),
-    QueryRewrite("query_rewrite_samples.json", "Query Rewrite")
+private enum class ModelSubMode(
+    val assetFile: String,
+    val label: String,
+    val toolsJson: String
+) {
+    ActionParam(
+        assetFile = "action_param_samples.json",
+        label = "Action Param",
+        toolsJson = FunctionGemmaPrompt.ACTION_PARAM_TOOL_JSON
+    ),
+    QueryRewrite(
+        assetFile = "query_rewrite_samples.json",
+        label = "Query Rewrite",
+        toolsJson = FunctionGemmaPrompt.QUERY_REWRITE_TOOL_JSON
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -139,8 +151,10 @@ fun ModelScreen() {
                 enabled = !running,
                 onClick = {
                     val capturedInput = inputText
+                    val capturedToolsJson = subMode.toolsJson
                     runInference(
                         inputText = capturedInput,
+                        toolsJson = capturedToolsJson,
                         onStart = {
                             running = true
                             rawText = "Running inference..."
@@ -150,6 +164,7 @@ fun ModelScreen() {
                             rawText = buildRawDataReport(
                                 elapsedMs = elapsedMs,
                                 userInput = capturedInput,
+                                toolsJson = capturedToolsJson,
                                 raw = raw
                             )
                             resultText = parseFunctionGemmaOutput(raw)
@@ -205,6 +220,7 @@ fun ModelScreen() {
 
 private fun runInference(
     inputText: String,
+    toolsJson: String,
     onStart: () -> Unit,
     onResult: (elapsedMs: Long, raw: String) -> Unit,
     onError: (String) -> Unit,
@@ -216,7 +232,7 @@ private fun runInference(
         return
     }
     onStart()
-    val systemInstruction = FunctionGemmaPrompt.buildSystemInstruction()
+    val systemInstruction = FunctionGemmaPrompt.buildSystemInstruction(toolsJson)
     val context = contextProvider()
     scope.launch {
         val outcome = withContext(Dispatchers.IO) {
@@ -281,9 +297,10 @@ private fun parseArgsCompact(body: String): String {
 private fun buildRawDataReport(
     elapsedMs: Long,
     userInput: String,
+    toolsJson: String,
     raw: String
 ): String {
-    val displayPrompt = FunctionGemmaPrompt.buildDisplayPrompt(userInput)
+    val displayPrompt = FunctionGemmaPrompt.buildDisplayPrompt(userInput, toolsJson)
     return buildString {
         append("Elapsed: ").append(elapsedMs).append(" ms")
         append("\n\n")
@@ -291,7 +308,7 @@ private fun buildRawDataReport(
         append(displayPrompt)
         append("\n\n")
         append("Output:\n")
-        append(buildOutputBreakdown(raw))
+        append(buildOutputBreakdown(raw, toolsJson))
     }
 }
 
@@ -320,7 +337,7 @@ private fun parseArgsDetailed(body: String): List<ParsedArg> {
     }
 }
 
-private fun buildOutputBreakdown(raw: String): String {
+private fun buildOutputBreakdown(raw: String, toolsJson: String): String {
     val matches = FUNCTION_CALL_REGEX.findAll(raw).toList()
     if (matches.isEmpty()) {
         return "No function call detected — model returned plain text.\n\n" +
@@ -331,7 +348,7 @@ private fun buildOutputBreakdown(raw: String): String {
             if (idx > 0) append("\n")
             val name = match.groupValues[1]
             val argsBody = match.groupValues[2]
-            val toolSchema = FunctionGemmaPrompt.lookupTool(name)
+            val toolSchema = FunctionGemmaPrompt.lookupTool(name, toolsJson)
             append("Function #").append(idx + 1).append(": ").append(name).append('\n')
             if (toolSchema == null) {
                 append("  (function not declared in tools schema)\n")

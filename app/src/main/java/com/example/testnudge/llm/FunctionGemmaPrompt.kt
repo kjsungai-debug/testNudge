@@ -22,75 +22,97 @@ object FunctionGemmaPrompt {
         "You are a model that can do function calling with the following functions"
 
     /**
-     * Arbitrary tool schema. Edit this JSON to expose different functions to
-     * the model — the schema follows the OpenAI-style function declaration
-     * shape that the chat template expects.
+     * Tool schema for the Action Param sub-mode. A single function that
+     * classifies the request into one of three categories (location, calendar,
+     * photo) and extracts the fields relevant to that category. All
+     * category-specific fields are declared at the top level — the model
+     * fills only the ones applicable to the chosen `category`.
      */
-    val TOOLS_JSON: String = """
+    val ACTION_PARAM_TOOL_JSON: String = """
         [
           {
             "type": "function",
             "function": {
-              "name": "get_current_temperature",
-              "description": "Gets the current temperature for a given location.",
+              "name": "action_param",
+              "description": "Classifies the user request into one of {location, calendar, photo} and extracts the parameters relevant to that category. Only fill the fields applicable to the chosen category; leave others unset.",
               "parameters": {
                 "type": "object",
                 "properties": {
-                  "location": {
+                  "category": {
                     "type": "string",
-                    "description": "The city name, e.g. San Francisco"
-                  }
-                },
-                "required": ["location"]
-              }
-            }
-          },
-          {
-            "type": "function",
-            "function": {
-              "name": "send_text_message",
-              "description": "Sends a text message to the given recipient.",
-              "parameters": {
-                "type": "object",
-                "properties": {
-                  "recipient": {
-                    "type": "string",
-                    "description": "Phone number or contact name of the recipient"
+                    "enum": ["location", "calendar", "photo"],
+                    "description": "Which category the request belongs to."
                   },
-                  "body": {
+                  "location_name": {
                     "type": "string",
-                    "description": "The message body"
-                  }
-                },
-                "required": ["recipient", "body"]
-              }
-            }
-          },
-          {
-            "type": "function",
-            "function": {
-              "name": "set_alarm",
-              "description": "Sets an alarm for the specified time on the user's device.",
-              "parameters": {
-                "type": "object",
-                "properties": {
-                  "time": {
-                    "type": "string",
-                    "description": "Alarm time in HH:MM 24-hour format"
+                    "description": "[location] Specific place or address mentioned, e.g. 'Starbucks Gangnam'."
                   },
-                  "label": {
+                  "place_type": {
                     "type": "string",
-                    "description": "Optional label for the alarm"
+                    "description": "[location] Generic place category, e.g. 'cafe', 'gas station'."
+                  },
+                  "event_title": {
+                    "type": "string",
+                    "description": "[calendar] Title or summary of the calendar event."
+                  },
+                  "event_time": {
+                    "type": "string",
+                    "description": "[calendar] When the event happens, in natural language."
+                  },
+                  "photo_subject": {
+                    "type": "string",
+                    "description": "[photo] What or who the photo is of."
+                  },
+                  "photo_time": {
+                    "type": "string",
+                    "description": "[photo] When the photo was taken or should be taken."
                   }
                 },
-                "required": ["time"]
+                "required": ["category"]
               }
             }
           }
         ]
     """.trimIndent()
 
-    fun buildSystemInstruction(toolsJson: String = TOOLS_JSON): String {
+    /**
+     * Tool schema for the Query Rewrite sub-mode. Generates a complete,
+     * well-formed query string and classifies the request's intent and
+     * primary entity type.
+     */
+    val QUERY_REWRITE_TOOL_JSON: String = """
+        [
+          {
+            "type": "function",
+            "function": {
+              "name": "query_rewrite",
+              "description": "Rewrites the user's raw input into a complete, well-formed query and classifies the intent and the primary entity referenced.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The rewritten, complete user query."
+                  },
+                  "intent": {
+                    "type": "string",
+                    "enum": ["location_name", "call_type"],
+                    "description": "The user intent — 'location_name' for finding/looking up a place, 'call_type' for placing or managing a call."
+                  },
+                  "entity": {
+                    "type": "string",
+                    "enum": ["location", "call", "text"],
+                    "description": "The primary entity referenced — a place ('location'), a call/contact ('call'), or freeform text ('text')."
+                  }
+                },
+                "required": ["query", "intent", "entity"]
+              }
+            }
+          }
+        ]
+    """.trimIndent()
+
+    fun buildSystemInstruction(toolsJson: String): String {
         val tools = JSONArray(toolsJson)
         return buildString {
             append(SYSTEM_PROMPT)
@@ -109,7 +131,7 @@ object FunctionGemmaPrompt {
      * the LiteRT-LM runtime feeds to the model is generated internally and
      * may differ slightly in whitespace.
      */
-    fun buildDisplayPrompt(userInput: String, toolsJson: String = TOOLS_JSON): String {
+    fun buildDisplayPrompt(userInput: String, toolsJson: String): String {
         val tools = JSONArray(toolsJson)
         return buildString {
             append("<bos>")
@@ -136,7 +158,7 @@ object FunctionGemmaPrompt {
     )
 
     /** Returns the parameter spec map for the given function name, or null if no such tool. */
-    fun lookupTool(functionName: String, toolsJson: String = TOOLS_JSON): Map<String, ParamSpec>? {
+    fun lookupTool(functionName: String, toolsJson: String): Map<String, ParamSpec>? {
         val tools = JSONArray(toolsJson)
         for (i in 0 until tools.length()) {
             val tool = tools.getJSONObject(i)

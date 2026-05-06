@@ -1,26 +1,26 @@
 [
   {
-    "title": "Weather (London)",
-    "text": "What's the temperature in London?"
+    "title": "Location — specific place",
+    "text": "Find a Starbucks near Gangnam station."
   },
   {
-    "title": "Weather (Seoul)",
-    "text": "How hot is it in Seoul right now?"
+    "title": "Location — generic type",
+    "text": "Show me gas stations along the route to Busan."
   },
   {
-    "title": "Send SMS",
-    "text": "Send a text to Alice telling her I'll be 10 minutes late."
+    "title": "Calendar — meeting",
+    "text": "Schedule a team standup tomorrow at 9 AM."
   },
   {
-    "title": "Set Alarm",
-    "text": "Wake me up at 7:30 tomorrow morning."
+    "title": "Calendar — birthday",
+    "text": "Add Mom's birthday party to my calendar on Saturday at 6 PM."
   },
   {
-    "title": "Set Alarm (with label)",
-    "text": "Set an alarm for 6:00 labeled morning run."
+    "title": "Photo — subject",
+    "text": "Show me photos of my dog from last weekend."
   },
   {
-    "title": "Irrelevant Query",
-    "text": "Who painted the Mona Lisa?"
+    "title": "Photo — trip",
+    "text": "Find pictures from my Tokyo trip last summer."
   }
 ]
