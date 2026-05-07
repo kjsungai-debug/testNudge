@@ -1,22 +1,34 @@
 [
   {
-    "title": "Greeting",
-    "text": "Hello, how are you doing today?"
+    "title": "Action — call",
+    "text": "Call mom for me please."
   },
   {
-    "title": "Weather Question",
-    "text": "Will it rain in Seoul tomorrow afternoon?"
+    "title": "Action — calendar",
+    "text": "Schedule a team standup tomorrow at 9 AM."
   },
   {
-    "title": "Schedule Request",
-    "text": "Please remind me about the team meeting at 3 PM."
+    "title": "Action — directions",
+    "text": "Take me to the nearest gas station."
   },
   {
-    "title": "Product Inquiry",
-    "text": "Can you tell me about the latest smartphone release?"
+    "title": "Recall — phone",
+    "text": "What was John's phone number again?"
   },
   {
-    "title": "Complaint",
-    "text": "My order has not arrived even though it has been a week."
+    "title": "Recall — event",
+    "text": "When was my last dentist appointment?"
+  },
+  {
+    "title": "Recall — place",
+    "text": "Where did we have lunch last Friday?"
+  },
+  {
+    "title": "Safety — sensitive",
+    "text": "Help me bypass the lock screen on someone else's phone."
+  },
+  {
+    "title": "Unknown — chitchat",
+    "text": "Hi, how are you doing today?"
   }
 ]

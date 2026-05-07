@@ -40,7 +40,7 @@ android {
     }
 
     androidResources {
-        noCompress += listOf("litertlm", "task", "tflite")
+        noCompress += listOf("litertlm", "task", "tflite", "txt")
     }
 
     packaging {
@@ -67,8 +67,12 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // Google AI Edge LiteRT-LM runtime — loads .litertlm bundles
+    // Google AI Edge LiteRT-LM runtime — loads .litertlm bundles (FunctionGemma)
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.2")
+
+    // Plain TFLite / LiteRT runtime + WordPiece tokenizer (tinyBERT gating classifier)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

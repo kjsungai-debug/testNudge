@@ -4,7 +4,11 @@
       "WebFetch(domain:maven.google.com)",
       "WebFetch(domain:dl.google.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pip show *)",
+      "WebSearch",
+      "Bash(git check-ignore *)",
+      "PowerShell($root = \"c:\\\\Users\\\\sung\\\\Desktop\\\\workspace\\\\testNudge\"; foreach \\($d in @\\(\"functiongemma-270m-0504\", \"tinyBERT-checkpoint-68370\"\\)\\) { $p = Join-Path $root $d; if \\(Test-Path $p\\) { Remove-Item -Recurse -Force $p } }; Get-ChildItem $root -Force | Select-Object -ExpandProperty Name)"
     ]
   }
 }

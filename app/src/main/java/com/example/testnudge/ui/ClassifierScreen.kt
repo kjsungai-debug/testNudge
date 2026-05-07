@@ -26,15 +26,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.testnudge.data.SampleText
 import com.example.testnudge.data.SampleTextRepository
-import com.example.testnudge.llm.FunctionGemmaPrompt
-import com.example.testnudge.llm.LlmInferenceService
+import com.example.testnudge.llm.TinyBertGatingService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class ClassifierMode(val assetFile: String, val label: String) {
-    Gating("gating_samples.json", "Gating"),
-    Model("model_samples.json", "Model")
+    Gating("gating_samples.json", "Gating")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,44 +107,34 @@ fun ClassifierScreen(mode: ClassifierMode) {
             label = { Text("Result") },
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 120.dp)
+                .heightIn(min = 160.dp)
         )
 
         Button(
             enabled = !running,
             onClick = {
-                if (inputText.isBlank()) {
+                val capturedInput = inputText
+                if (capturedInput.isBlank()) {
                     resultText = "Input is empty."
                     return@Button
                 }
-                when (mode) {
-                    ClassifierMode.Gating -> {
-                        resultText = "[Gating] Classification not implemented yet."
-                    }
-                    ClassifierMode.Model -> {
-                        running = true
-                        resultText = "Running inference..."
-                        val systemInstruction = FunctionGemmaPrompt.buildSystemInstruction()
-                        val userInput = inputText
-                        scope.launch {
-                            val outcome = withContext(Dispatchers.IO) {
-                                runCatching {
-                                    val service = LlmInferenceService.get(context)
-                                    val start = System.currentTimeMillis()
-                                    val response = service.generateResponse(userInput, systemInstruction)
-                                    val elapsedMs = System.currentTimeMillis() - start
-                                    elapsedMs to response
-                                }
-                            }
-                            resultText = outcome.fold(
-                                onSuccess = { (elapsedMs, response) ->
-                                    "Elapsed: ${elapsedMs} ms\n\n$response"
-                                },
-                                onFailure = { e -> "Error: ${e.message}" }
-                            )
-                            running = false
+                running = true
+                resultText = "Running gating..."
+                scope.launch {
+                    val outcome = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val service = TinyBertGatingService.get(context)
+                            val start = System.currentTimeMillis()
+                            val scores = service.classify(capturedInput)
+                            val elapsedMs = System.currentTimeMillis() - start
+                            elapsedMs to scores
                         }
                     }
+                    resultText = outcome.fold(
+                        onSuccess = { (elapsedMs, scores) -> formatScores(elapsedMs, scores) },
+                        onFailure = { e -> "Error: ${e.message ?: e::class.simpleName.orEmpty()}" }
+                    )
+                    running = false
                 }
             },
             modifier = Modifier.align(Alignment.End)
@@ -154,4 +142,29 @@ fun ClassifierScreen(mode: ClassifierMode) {
             Text(if (running) "Running..." else "Run")
         }
     }
+}
+
+private const val DECISION_THRESHOLD = 0.5f
+
+private fun formatScores(elapsedMs: Long, scores: List<TinyBertGatingService.Score>): String {
+    val top = scores.first()
+    val passed = scores.filter { it.probability >= DECISION_THRESHOLD }
+    val passedSummary = if (passed.isEmpty()) "(none above $DECISION_THRESHOLD)" else
+        passed.joinToString(", ") { it.label }
+    val maxLabelWidth = scores.maxOf { it.label.length }
+    return buildString {
+        append("Elapsed: ").append(elapsedMs).append(" ms\n\n")
+        append("Top label: ").append(top.label)
+            .append(" (").append("%.3f".format(top.probability)).append(")\n")
+        append("Above threshold (>= ").append(DECISION_THRESHOLD).append("): ")
+            .append(passedSummary).append("\n\n")
+        append("All scores:\n")
+        scores.forEach { score ->
+            append("  ")
+                .append(score.label.padEnd(maxLabelWidth))
+                .append("  ")
+                .append("%.3f".format(score.probability))
+                .append('\n')
+        }
+    }.trimEnd()
 }

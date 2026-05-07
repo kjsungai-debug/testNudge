@@ -5,117 +5,85 @@ import org.json.JSONObject
 
 /**
  * Builds the developer-turn content (system instruction + tool declarations)
- * that gets passed to LiteRT-LM via [com.google.ai.edge.litertlm.ConversationConfig.systemInstruction].
+ * that gets passed to LiteRT-LM via [com.google.ai.edge.litertlm.ConversationConfig.systemInstruction],
+ * plus a per-mode user-turn prefix that the caller prepends to the user input.
  *
- * The .litertlm bundle's embedded chat template already wraps everything in
- * `<start_of_turn>developer ... <end_of_turn>` and adds the user/model turns,
- * so we only need to emit the inner body. The user's free-form text is sent
- * separately as the message — it becomes the user-turn content.
- *
- * Tool declarations are emitted using FunctionGemma's raw template syntax
- * (`<start_function_declaration>...<end_function_declaration>`) which the
- * tokenizer recognizes as special tokens.
+ * The prompts here mirror the two training prompts (`text_input_action` and
+ * `text_input_recall`) shipped with the FunctionGemma fine-tune's `prompt.py`
+ * — same system text, same tool declarations (with empty inner descriptions /
+ * types where the training prompt has them), same user-turn prefix.
  */
 object FunctionGemmaPrompt {
 
-    private const val SYSTEM_PROMPT =
-        "You are a model that can do function calling with the following functions"
+    // ─── System prompts (developer-turn body, before tool declarations) ──────────
+
+    /** System text for Action Param. Source: `text_input_action` in prompt.py. */
+    const val ACTION_SYSTEM_PROMPT: String =
+        "You are a virtual assistant to proactively suggest helpful actions. " +
+            "Analyze the given conversation and call the appropriate tool. " +
+            "If no tool applies, call `unknown`."
+
+    /** System text for Query Rewrite. Source: `text_input_recall` in prompt.py. */
+    const val RECALL_SYSTEM_PROMPT: String = """You are a conversation history search assistant. Given the conversation, generate a search query to find relevant information from past conversations or device memory. ALWAYS call the `search` tool.
+
+Available tool:
+- search: Search device memory or conversation history for information. Params: query (search query), intent (type of information: NO_RECALL_INTENT, ACCOUNT_ID, ACCOUNT_NAME, ADDRESS, BIRTHDAY, BRAND, BUSINESS_NAME, CARD_CVV, CARD_NUMBER, CONFIRMATION_NUMBER, COUPON_CODE, DRIVERS_LICENSE_NUMBER, DURATION, EMAIL, END_DATETIME, EVENT_NAME, FLIGHT_NUMBER, ID_NUMBER, LOCATION_NAME, LOCATION_REGION, MEDIA_ALBUM, MEDIA_TITLE, MEMBERSHIP_NUMBER, ORDER_CARRIER, ORDER_ITEM_NAME_QUANTITY, PASSPORT_NUMBER, PERSON_NAME, PHONE_NUMBER, PLATFORM, PRICE, PRODUCT_CATEGORY, PRODUCT_NAME, PURCHASED, QUANTITY, SEAT_NUMBER, START_DATETIME, TRACKING_NUMBER, TRANSPORTATION_ARRIVAL_GATE, TRANSPORTATION_ARRIVAL_LOCATION, TRANSPORTATION_ARRIVAL_TERMINAL, TRANSPORTATION_DEPARTURE_GATE, TRANSPORTATION_DEPARTURE_LOCATION, TRANSPORTATION_DEPARTURE_TERMINAL, TRANSPORTATION_TYPE, URL, VEHICLE_LICENSE_PLATE, WIFI_PASSWORD, WIFI_SSID), entity (entity category: PERSON, BUSINESS, EVENT, RESERVATION, LOCATION, TRANSPORTATION, HOTEL, MOVIE, MUSIC, BOOK, VIDEO, ARTICLE, TV, PRODUCT, ORDER, SOCIAL_MEDIA, CREDENTIALS, PAYMENT, PERSONAL_INFO, DOCUMENT)"""
+
+    // ─── User-turn prefixes (prepended to inputText before sendMessageAsync) ─────
+
+    /** User-turn prefix for Action Param — matches the framing in text_input_action. */
+    const val ACTION_USER_PREFIX: String =
+        "Refer to the following conversation to generate action.\n<user>: "
+
+    /** User-turn prefix for Query Rewrite — matches the framing in text_input_recall. */
+    const val RECALL_USER_PREFIX: String =
+        "Refer to the following conversation.\nuser: "
+
+    // ─── Tool schemas (rendered into <start_function_declaration>...<end_function_declaration>) ──
 
     /**
-     * Tool schema for the Action Param sub-mode. A single function that
-     * classifies the request into one of three categories (location, calendar,
-     * photo) and extracts the fields relevant to that category. All
-     * category-specific fields are declared at the top level — the model
-     * fills only the ones applicable to the chosen `category`.
+     * Action Param tool set. Nine functions (call, create_calendar, location,
+     * payment, photo, reminder, search, unknown, view_calendar). Inner
+     * description/type fields are intentionally left empty — that's how the
+     * training prompt was formatted.
      */
     val ACTION_PARAM_TOOL_JSON: String = """
         [
-          {
-            "type": "function",
-            "function": {
-              "name": "action_param",
-              "description": "Classifies the user request into one of {location, calendar, photo} and extracts the parameters relevant to that category. Only fill the fields applicable to the chosen category; leave others unset.",
-              "parameters": {
-                "type": "object",
-                "properties": {
-                  "category": {
-                    "type": "string",
-                    "enum": ["location", "calendar", "photo"],
-                    "description": "Which category the request belongs to."
-                  },
-                  "location_name": {
-                    "type": "string",
-                    "description": "[location] Specific place or address mentioned, e.g. 'Starbucks Gangnam'."
-                  },
-                  "place_type": {
-                    "type": "string",
-                    "description": "[location] Generic place category, e.g. 'cafe', 'gas station'."
-                  },
-                  "event_title": {
-                    "type": "string",
-                    "description": "[calendar] Title or summary of the calendar event."
-                  },
-                  "event_time": {
-                    "type": "string",
-                    "description": "[calendar] When the event happens, in natural language."
-                  },
-                  "photo_subject": {
-                    "type": "string",
-                    "description": "[photo] What or who the photo is of."
-                  },
-                  "photo_time": {
-                    "type": "string",
-                    "description": "[photo] When the photo was taken or should be taken."
-                  }
-                },
-                "required": ["category"]
-              }
-            }
-          }
+          {"type":"function","function":{"name":"call","description":"Make a call or send a text to a contact.","parameters":{"type":"object","properties":{"name":{"description":"","type":""},"number":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"create_calendar","description":"Create a calendar event with the given details.","parameters":{"type":"object","properties":{"end":{"description":"","type":""},"location":{"description":"","type":""},"start":{"description":"","type":""},"title":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"location","description":"Open a location in maps or navigate.","parameters":{"type":"object","properties":{"location":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"payment","description":"Send a payment via a banking app.","parameters":{"type":"object","properties":{"account":{"description":"","type":""},"application":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"photo","description":"Share or capture a photo.","parameters":{"type":"object","properties":{"photo":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"reminder","description":"Set a reminder.","parameters":{"type":"object","properties":{"start":{"description":"","type":""},"title":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"search","description":"Search on the device for information.","parameters":{"type":"object","properties":{"entity":{"description":"","type":""},"intent":{"description":"","type":""},"query":{"description":"","type":""}}}}},
+          {"type":"function","function":{"name":"unknown","description":"No actionable tool call applies.","parameters":{"type":"object"}}},
+          {"type":"function","function":{"name":"view_calendar","description":"View calendar events for a given time.","parameters":{"type":"object","properties":{"start":{"description":"","type":""}}}}}
         ]
     """.trimIndent()
 
     /**
-     * Tool schema for the Query Rewrite sub-mode. Generates a complete,
-     * well-formed query string and classifies the request's intent and
-     * primary entity type.
+     * Query Rewrite tool set. A single `search` function with all intent and
+     * entity enums listed in the function description (matching text_input_recall
+     * verbatim).
      */
     val QUERY_REWRITE_TOOL_JSON: String = """
         [
-          {
-            "type": "function",
-            "function": {
-              "name": "query_rewrite",
-              "description": "Rewrites the user's raw input into a complete, well-formed query and classifies the intent and the primary entity referenced.",
-              "parameters": {
-                "type": "object",
-                "properties": {
-                  "query": {
-                    "type": "string",
-                    "description": "The rewritten, complete user query."
-                  },
-                  "intent": {
-                    "type": "string",
-                    "enum": ["location_name", "call_type"],
-                    "description": "The user intent — 'location_name' for finding/looking up a place, 'call_type' for placing or managing a call."
-                  },
-                  "entity": {
-                    "type": "string",
-                    "enum": ["location", "call", "text"],
-                    "description": "The primary entity referenced — a place ('location'), a call/contact ('call'), or freeform text ('text')."
-                  }
-                },
-                "required": ["query", "intent", "entity"]
-              }
-            }
-          }
+          {"type":"function","function":{"name":"search","description":"Search device memory or conversation history for information. Intent types: NO_RECALL_INTENT, ACCOUNT_ID, ACCOUNT_NAME, ADDRESS, BIRTHDAY, BRAND, BUSINESS_NAME, CARD_CVV, CARD_NUMBER, CONFIRMATION_NUMBER, COUPON_CODE, DRIVERS_LICENSE_NUMBER, DURATION, EMAIL, END_DATETIME, EVENT_NAME, FLIGHT_NUMBER, ID_NUMBER, LOCATION_NAME, LOCATION_REGION, MEDIA_ALBUM, MEDIA_TITLE, MEMBERSHIP_NUMBER, ORDER_CARRIER, ORDER_ITEM_NAME_QUANTITY, PASSPORT_NUMBER, PERSON_NAME, PHONE_NUMBER, PLATFORM, PRICE, PRODUCT_CATEGORY, PRODUCT_NAME, PURCHASED, QUANTITY, SEAT_NUMBER, START_DATETIME, TRACKING_NUMBER, TRANSPORTATION_ARRIVAL_GATE, TRANSPORTATION_ARRIVAL_LOCATION, TRANSPORTATION_ARRIVAL_TERMINAL, TRANSPORTATION_DEPARTURE_GATE, TRANSPORTATION_DEPARTURE_LOCATION, TRANSPORTATION_DEPARTURE_TERMINAL, TRANSPORTATION_TYPE, URL, VEHICLE_LICENSE_PLATE, WIFI_PASSWORD, WIFI_SSID. Entity types: PERSON, BUSINESS, EVENT, RESERVATION, LOCATION, TRANSPORTATION, HOTEL, MOVIE, MUSIC, BOOK, VIDEO, ARTICLE, TV, PRODUCT, ORDER, SOCIAL_MEDIA, CREDENTIALS, PAYMENT, PERSONAL_INFO, DOCUMENT.","parameters":{"type":"object","properties":{"entity":{"description":"","type":""},"intent":{"description":"","type":""},"query":{"description":"","type":""}}}}}
         ]
     """.trimIndent()
 
-    fun buildSystemInstruction(toolsJson: String): String {
+    // ─── Builders ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the developer-turn body — `systemPrompt` directly followed by
+     * one `<start_function_declaration>...<end_function_declaration>` per
+     * tool, with no separator. LiteRT-LM wraps the result in
+     * `<start_of_turn>developer ... <end_of_turn>`.
+     */
+    fun buildSystemInstruction(systemPrompt: String, toolsJson: String): String {
         val tools = JSONArray(toolsJson)
         return buildString {
-            append(SYSTEM_PROMPT)
+            append(systemPrompt)
             for (i in 0 until tools.length()) {
                 append("<start_function_declaration>")
                 append(formatFunctionDeclaration(tools.getJSONObject(i)))
@@ -125,30 +93,32 @@ object FunctionGemmaPrompt {
     }
 
     /**
-     * Returns the FunctionGemma chat-template-rendered prompt as a single
-     * string for display/debugging. Mirrors the structure produced by
-     * `chat_template.jinja` but reconstructed in Kotlin — the actual prompt
-     * the LiteRT-LM runtime feeds to the model is generated internally and
-     * may differ slightly in whitespace.
+     * Returns the full chat-template-rendered prompt as a single string for
+     * display/debugging. Mirrors the structure of `text_input_action` /
+     * `text_input_recall` in prompt.py — the runtime's actual prompt may
+     * differ in whitespace.
+     *
+     * `userTurnContent` is the full user-turn body (already includes the
+     * mode-specific user prefix + the user's input).
      */
-    fun buildDisplayPrompt(userInput: String, toolsJson: String): String {
-        val tools = JSONArray(toolsJson)
+    fun buildDisplayPrompt(
+        systemPrompt: String,
+        userTurnContent: String,
+        toolsJson: String
+    ): String {
         return buildString {
             append("<bos>")
             append("<start_of_turn>developer\n")
-            append(SYSTEM_PROMPT)
-            for (i in 0 until tools.length()) {
-                append("<start_function_declaration>")
-                append(formatFunctionDeclaration(tools.getJSONObject(i)))
-                append("<end_function_declaration>")
-            }
+            append(buildSystemInstruction(systemPrompt, toolsJson))
             append("<end_of_turn>\n")
             append("<start_of_turn>user\n")
-            append(userInput.trim())
+            append(userTurnContent.trimEnd())
             append("<end_of_turn>\n")
             append("<start_of_turn>model\n")
         }
     }
+
+    // ─── Schema lookup (used by the Output breakdown in Raw Data) ────────────────
 
     data class ParamSpec(
         val name: String,
@@ -176,7 +146,7 @@ object FunctionGemmaPrompt {
                 val prop = properties.getJSONObject(key)
                 result[key] = ParamSpec(
                     name = key,
-                    type = prop.optString("type", "string"),
+                    type = prop.optString("type", ""),
                     description = prop.optString("description", ""),
                     required = key in requiredSet
                 )
@@ -185,6 +155,8 @@ object FunctionGemmaPrompt {
         }
         return null
     }
+
+    // ─── Rendering helpers ───────────────────────────────────────────────────────
 
     private fun formatFunctionDeclaration(tool: JSONObject): String {
         val function = tool.getJSONObject("function")
@@ -226,8 +198,9 @@ object FunctionGemmaPrompt {
         return keys.joinToString(",") { key ->
             val value = properties.getJSONObject(key)
             val description = value.optString("description", "")
-            val type = value.optString("type", "string").uppercase()
-            "$key:{description:<escape>$description<escape>,type:<escape>$type<escape>}"
+            val type = value.optString("type", "")
+            val typeRendered = if (type.isEmpty()) "" else type.uppercase()
+            "$key:{description:<escape>$description<escape>,type:<escape>$typeRendered<escape>}"
         }
     }
 }

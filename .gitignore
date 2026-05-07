@@ -56,5 +56,19 @@ Desktop.ini
 *.log
 hs_err_pid*
 
-# Bundled SLM model (too large for git — copy back into assets/ before building)
-app/src/main/assets/tiny_garden.litertlm
+# HuggingFace fine-tune sources for the conversions (large checkpoints)
+functiongemma-270m-0504/
+tinyBERT-checkpoint-68370/
+
+# Conversion intermediates produced by tools/convert_functiongemma.py
+tools/build/
+tools/.venv/
+.venv/
+
+# Generated model assets (too large / generated for git — kept locally outside
+# the build tree; run tools/convert_functiongemma.py + tools/convert_tinybert.py
+# and copy the resulting files into app/src/main/assets/ before building)
+backup/
+app/src/main/assets/*.litertlm
+app/src/main/assets/*.tflite
+app/src/main/assets/tinybert_vocab.txt

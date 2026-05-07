@@ -42,8 +42,8 @@ class LlmInferenceService private constructor(
 
     companion object {
         private const val TAG = "LlmInferenceService"
-        private const val ASSET_NAME = "tiny_garden.litertlm"
-        private const val LOCAL_NAME = "tiny_garden.litertlm"
+        private const val ASSET_NAME = "functiongemma_270m.litertlm"
+        private const val LOCAL_NAME = "functiongemma_270m.litertlm"
 
         private val initMutex = Mutex()
 

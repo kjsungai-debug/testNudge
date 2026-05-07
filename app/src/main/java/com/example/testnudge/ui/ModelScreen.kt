@@ -40,17 +40,23 @@ import kotlinx.coroutines.withContext
 private enum class ModelSubMode(
     val assetFile: String,
     val label: String,
-    val toolsJson: String
+    val systemPrompt: String,
+    val toolsJson: String,
+    val userTurnPrefix: String
 ) {
     ActionParam(
         assetFile = "action_param_samples.json",
         label = "Action Param",
-        toolsJson = FunctionGemmaPrompt.ACTION_PARAM_TOOL_JSON
+        systemPrompt = FunctionGemmaPrompt.ACTION_SYSTEM_PROMPT,
+        toolsJson = FunctionGemmaPrompt.ACTION_PARAM_TOOL_JSON,
+        userTurnPrefix = FunctionGemmaPrompt.ACTION_USER_PREFIX
     ),
     QueryRewrite(
         assetFile = "query_rewrite_samples.json",
         label = "Query Rewrite",
-        toolsJson = FunctionGemmaPrompt.QUERY_REWRITE_TOOL_JSON
+        systemPrompt = FunctionGemmaPrompt.RECALL_SYSTEM_PROMPT,
+        toolsJson = FunctionGemmaPrompt.QUERY_REWRITE_TOOL_JSON,
+        userTurnPrefix = FunctionGemmaPrompt.RECALL_USER_PREFIX
     )
 }
 
@@ -151,10 +157,12 @@ fun ModelScreen() {
                 enabled = !running,
                 onClick = {
                     val capturedInput = inputText
-                    val capturedToolsJson = subMode.toolsJson
+                    val capturedMode = subMode
+                    val userTurnContent = capturedMode.userTurnPrefix + capturedInput
                     runInference(
-                        inputText = capturedInput,
-                        toolsJson = capturedToolsJson,
+                        userTurnContent = userTurnContent,
+                        systemPrompt = capturedMode.systemPrompt,
+                        toolsJson = capturedMode.toolsJson,
                         onStart = {
                             running = true
                             rawText = "Running inference..."
@@ -163,8 +171,9 @@ fun ModelScreen() {
                         onResult = { elapsedMs, raw ->
                             rawText = buildRawDataReport(
                                 elapsedMs = elapsedMs,
-                                userInput = capturedInput,
-                                toolsJson = capturedToolsJson,
+                                userTurnContent = userTurnContent,
+                                systemPrompt = capturedMode.systemPrompt,
+                                toolsJson = capturedMode.toolsJson,
                                 raw = raw
                             )
                             resultText = parseFunctionGemmaOutput(raw)
@@ -219,7 +228,8 @@ fun ModelScreen() {
 }
 
 private fun runInference(
-    inputText: String,
+    userTurnContent: String,
+    systemPrompt: String,
     toolsJson: String,
     onStart: () -> Unit,
     onResult: (elapsedMs: Long, raw: String) -> Unit,
@@ -227,19 +237,19 @@ private fun runInference(
     scope: kotlinx.coroutines.CoroutineScope,
     contextProvider: () -> android.content.Context
 ) {
-    if (inputText.isBlank()) {
+    if (userTurnContent.isBlank()) {
         onError("Input is empty.")
         return
     }
     onStart()
-    val systemInstruction = FunctionGemmaPrompt.buildSystemInstruction(toolsJson)
+    val systemInstruction = FunctionGemmaPrompt.buildSystemInstruction(systemPrompt, toolsJson)
     val context = contextProvider()
     scope.launch {
         val outcome = withContext(Dispatchers.IO) {
             runCatching {
                 val service = LlmInferenceService.get(context)
                 val start = System.currentTimeMillis()
-                val response = service.generateResponse(inputText, systemInstruction)
+                val response = service.generateResponse(userTurnContent, systemInstruction)
                 val elapsedMs = System.currentTimeMillis() - start
                 elapsedMs to response
             }
@@ -296,11 +306,16 @@ private fun parseArgsCompact(body: String): String {
  */
 private fun buildRawDataReport(
     elapsedMs: Long,
-    userInput: String,
+    userTurnContent: String,
+    systemPrompt: String,
     toolsJson: String,
     raw: String
 ): String {
-    val displayPrompt = FunctionGemmaPrompt.buildDisplayPrompt(userInput, toolsJson)
+    val displayPrompt = FunctionGemmaPrompt.buildDisplayPrompt(
+        systemPrompt = systemPrompt,
+        userTurnContent = userTurnContent,
+        toolsJson = toolsJson
+    )
     return buildString {
         append("Elapsed: ").append(elapsedMs).append(" ms")
         append("\n\n")
@@ -360,7 +375,7 @@ private fun buildOutputBreakdown(raw: String, toolsJson: String): String {
                 append("  Parameters:\n")
                 parsed.forEach { arg ->
                     val spec = toolSchema?.get(arg.key)
-                    val declaredType = spec?.type ?: "?"
+                    val declaredType = spec?.type?.takeIf { it.isNotEmpty() } ?: "unspecified"
                     val required = if (spec?.required == true) " required" else ""
                     val inferredType = if (arg.isQuoted) "string" else "literal"
                     append("    - ")
